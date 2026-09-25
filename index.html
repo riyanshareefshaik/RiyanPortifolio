@@ -960,7 +960,7 @@
 
         <div class="glass-object" id="glassObject">
           <div class="glass-frame">
-            <video class="hero-photo" id="heroVideo" src="assets/videos/hero-walk.mp4" poster="assets/videos/hero-walk-poster.jpg" autoplay muted loop playsinline preload="auto"></video>
+            <video class="hero-photo" id="heroVideo" src="assets/videos/hero-walk.mp4" poster="assets/videos/hero-walk-poster.jpg" muted playsinline preload="auto"></video>
             <div class="photo-vignette" aria-hidden="true"></div>
             <span class="bolt b1" aria-hidden="true"></span>
             <span class="bolt b2" aria-hidden="true"></span>
@@ -1215,20 +1215,13 @@
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     const heroVideo = document.getElementById("heroVideo");
+    let videoDuration = 0;
     if (heroVideo) {
-      if (reduceMotion) {
-        heroVideo.removeAttribute("autoplay");
-        heroVideo.pause();
-      } else {
-        heroVideo.play().catch(() => {});
-        const videoVisibility = new IntersectionObserver((entries) => {
-          entries.forEach((entry) => {
-            if (entry.isIntersecting) heroVideo.play().catch(() => {});
-            else heroVideo.pause();
-          });
-        }, { threshold: .15 });
-        videoVisibility.observe(heroVideo);
-      }
+      heroVideo.pause();
+      heroVideo.addEventListener("loadedmetadata", () => {
+        videoDuration = heroVideo.duration || 0;
+      });
+      if (heroVideo.readyState >= 1) videoDuration = heroVideo.duration || 0;
     }
 
     const heroSection = document.getElementById("home");
@@ -1240,8 +1233,12 @@
         const rect = heroSection.getBoundingClientRect();
         const span = rect.height * .9 || 1;
         const progress = Math.min(Math.max(-rect.top / span, 0), 1);
-        stage.style.transform = `translateY(${progress * 46}px) scale(${1 - progress * .1})`;
-        stage.style.opacity = 1 - progress * .6;
+
+        if (heroVideo && videoDuration) {
+          heroVideo.currentTime = progress * videoDuration;
+        }
+
+        stage.style.opacity = 1 - (Math.max(progress - .7, 0) / .3) * .7;
       }
 
       window.addEventListener("scroll", () => {
