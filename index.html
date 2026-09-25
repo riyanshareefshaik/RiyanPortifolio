@@ -194,12 +194,41 @@
     }
 
     .hero {
+      position: relative;
+      isolation: isolate;
       min-height: 100vh;
       padding-top: 132px;
       display: grid;
       grid-template-columns: minmax(0, .88fr) minmax(440px, 1.12fr);
       align-items: center;
       gap: clamp(38px, 5vw, 78px);
+    }
+
+    .hero-walker {
+      position: absolute;
+      inset: -64px -9vw -8px;
+      z-index: -1;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 1.1s ease;
+      -webkit-mask-image: linear-gradient(to bottom, transparent, rgba(0,0,0,.92) 16%, rgba(0,0,0,.92) 84%, transparent);
+      mask-image: linear-gradient(to bottom, transparent, rgba(0,0,0,.92) 16%, rgba(0,0,0,.92) 84%, transparent);
+    }
+
+    .hero-walker.is-ready { opacity: .92; }
+
+    .hero-walker canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .hero-walker { display: none; }
+    }
+
+    @media (max-width: 1080px) {
+      .hero-walker { display: none; }
     }
 
     .eyebrow {
@@ -931,6 +960,10 @@
 
   <main>
     <section class="container hero" id="home">
+      <div class="hero-walker" id="heroWalker" aria-hidden="true">
+        <canvas id="walkerCanvas"></canvas>
+      </div>
+
       <div class="reveal">
         <span class="eyebrow">Computer Science undergraduate</span>
         <h1>Shaik <span class="gold-text">Riyan Shareef</span></h1>
@@ -1208,6 +1241,204 @@
     }, { threshold: .11 });
 
     document.querySelectorAll(".reveal").forEach((element) => observer.observe(element));
+  </script>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+
+    const container = document.getElementById("heroWalker");
+    const canvas = document.getElementById("walkerCanvas");
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    if (container && canvas && !reduceMotion && window.WebGLRenderingContext) {
+      initHeroWalker(container, canvas).catch(() => {
+        container.style.display = "none";
+      });
+    }
+
+    async function initHeroWalker(container, canvas) {
+      const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.05;
+      if ("outputColorSpace" in renderer) renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+      const scene = new THREE.Scene();
+      scene.fog = new THREE.FogExp2(0x050504, 0.055);
+
+      const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 60);
+      camera.position.set(0, 1.55, 7.2);
+      const cameraTarget = new THREE.Vector3(0, 1.02, 0);
+      camera.lookAt(cameraTarget);
+
+      const hemiLight = new THREE.HemisphereLight(0xfff3d8, 0x120d06, 0.85);
+      scene.add(hemiLight);
+
+      const keyLight = new THREE.DirectionalLight(0xf6e3ae, 2.6);
+      keyLight.position.set(3.2, 6, 4.2);
+      keyLight.castShadow = true;
+      keyLight.shadow.mapSize.set(1024, 1024);
+      keyLight.shadow.camera.near = 1;
+      keyLight.shadow.camera.far = 20;
+      keyLight.shadow.camera.left = -6;
+      keyLight.shadow.camera.right = 6;
+      keyLight.shadow.camera.top = 4;
+      keyLight.shadow.camera.bottom = -2;
+      keyLight.shadow.bias = -0.0015;
+      scene.add(keyLight);
+
+      const rimLight = new THREE.DirectionalLight(0xc89c4a, 1.6);
+      rimLight.position.set(-4, 3.4, -5);
+      scene.add(rimLight);
+
+      const fillLight = new THREE.AmbientLight(0x201708, 0.55);
+      scene.add(fillLight);
+
+      const ground = new THREE.Mesh(
+        new THREE.PlaneGeometry(40, 40),
+        new THREE.ShadowMaterial({ opacity: 0.42 })
+      );
+      ground.rotation.x = -Math.PI / 2;
+      ground.receiveShadow = true;
+      scene.add(ground);
+
+      const loader = new GLTFLoader();
+      const gltf = await loader.loadAsync("assets/models/walker.glb");
+
+      const statueMaterial = new THREE.MeshStandardMaterial({
+        color: 0x0f0b06,
+        roughness: 0.55,
+        metalness: 0.65,
+      });
+
+      const model = gltf.scene;
+      model.traverse((object) => {
+        if (object.isMesh) {
+          object.castShadow = true;
+          object.receiveShadow = false;
+          object.material = statueMaterial;
+        }
+      });
+
+      const pivot = new THREE.Group();
+      pivot.add(model);
+      scene.add(pivot);
+
+      const mixer = new THREE.AnimationMixer(model);
+      const clips = gltf.animations || [];
+      const walkClip =
+        clips.find((clip) => /walk/i.test(clip.name)) || clips[Math.min(3, clips.length - 1)] || clips[0];
+
+      let walkAction = null;
+      if (walkClip) {
+        walkAction = mixer.clipAction(walkClip);
+        walkAction.play();
+      }
+
+      let rangeX = 3;
+      let direction = 1;
+      let turning = false;
+      let turnFrom = 0;
+      let turnTo = 0;
+      let turnElapsed = 0;
+      const turnDuration = 0.55;
+      const walkSpeed = 0.85;
+
+      function fitCameraRange() {
+        const distance = camera.position.z - pivot.position.z;
+        const visibleHeight = 2 * Math.tan((camera.fov * Math.PI) / 360) * distance;
+        const visibleWidth = visibleHeight * camera.aspect;
+        rangeX = Math.max(1.4, visibleWidth * 0.34);
+      }
+
+      function resize() {
+        const width = container.clientWidth || 1;
+        const height = container.clientHeight || 1;
+        renderer.setSize(width, height, false);
+        camera.aspect = width / height;
+        camera.updateProjectionMatrix();
+        fitCameraRange();
+      }
+
+      const resizeObserver = new ResizeObserver(resize);
+      resizeObserver.observe(container);
+      resize();
+
+      pivot.position.x = -rangeX;
+      pivot.rotation.y = Math.PI / 2;
+
+      let pointerX = 0;
+      let pointerY = 0;
+      window.addEventListener(
+        "pointermove",
+        (event) => {
+          pointerX = (event.clientX / window.innerWidth) * 2 - 1;
+          pointerY = (event.clientY / window.innerHeight) * 2 - 1;
+        },
+        { passive: true }
+      );
+
+      let visible = true;
+      const io = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            visible = entry.isIntersecting;
+          });
+        },
+        { threshold: 0.05 }
+      );
+      io.observe(container);
+
+      const clock = new THREE.Clock();
+
+      function animate() {
+        requestAnimationFrame(animate);
+        if (!visible) return;
+
+        const delta = Math.min(clock.getDelta(), 0.05);
+
+        if (turning) {
+          turnElapsed += delta;
+          const t = Math.min(turnElapsed / turnDuration, 1);
+          const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+          pivot.rotation.y = turnFrom + (turnTo - turnFrom) * eased;
+          if (t >= 1) turning = false;
+        } else {
+          pivot.position.x += direction * walkSpeed * delta;
+          if (pivot.position.x > rangeX || pivot.position.x < -rangeX) {
+            pivot.position.x = THREE.MathUtils.clamp(pivot.position.x, -rangeX, rangeX);
+            direction *= -1;
+            turning = true;
+            turnElapsed = 0;
+            turnFrom = pivot.rotation.y;
+            turnTo = direction > 0 ? Math.PI / 2 : -Math.PI / 2;
+          }
+        }
+
+        mixer.update(delta);
+
+        camera.position.x += (pointerX * 0.6 - camera.position.x) * 0.04;
+        camera.position.y += (1.55 - pointerY * 0.22 - camera.position.y) * 0.04;
+        camera.lookAt(cameraTarget);
+
+        renderer.render(scene, camera);
+      }
+
+      animate();
+      container.classList.add("is-ready");
+    }
   </script>
 </body>
 </html>
