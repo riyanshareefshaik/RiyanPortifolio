@@ -2,8 +2,13 @@
   <style>
     :root{--bg:#050504;--text:#f8f4eb;--muted:#a49b8d;--gold:#d2ad5c;--line:rgba(231,196,124,.2)}
     *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,sans-serif;line-height:1.75}
-    main{width:min(820px,calc(100% - 32px));margin:0 auto;padding:72px 0}
+    .brand-banner{position:relative;height:200px;overflow:hidden;border-bottom:1px solid var(--line);background:#0a0908}
+    .brand-banner video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;object-position:50% 50%;filter:grayscale(.25) brightness(.62) contrast(1.08)}
+    .brand-banner-scrim{position:absolute;inset:0;background:linear-gradient(180deg,rgba(5,5,4,.2),rgba(5,5,4,.95))}
+    .brand-banner-name{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);width:min(820px,calc(100% - 32px));font-family:Georgia,serif;font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold)}
+    @media (prefers-reduced-motion: reduce){.brand-banner video{display:none}}
+    main{width:min(820px,calc(100% - 32px));margin:0 auto;padding:48px 0 72px}
     a{color:var(--gold)} h1,h2{font-family:Georgia,serif} h1{font-size:clamp(42px,8vw,70px);line-height:1}
     h2{margin-top:38px} p,li{color:var(--muted)} .back{display:inline-block;margin-bottom:42px}
   </style>
-</head><body><main><a class="back" href="index.html">← Back to portfolio</a><h1>Cookie Policy</h1><p>Last updated: July 2026</p><p>This portfolio does not set first-party tracking or advertising cookies. It does not use login sessions, personalized advertising, or behavioral analytics.</p><h2>Third-party resources</h2><p>External resources such as Google Fonts or linked platforms may use cookies or similar technologies according to their own policies.</p><h2>Browser controls</h2><p>You can restrict or delete cookies through your browser settings.</p></main></body></html>
+</head><body><div class="brand-banner" aria-hidden="true"><video src="assets/videos/hero-walk.mp4" poster="assets/videos/hero-walk-poster.jpg" autoplay muted loop playsinline></video><div class="brand-banner-scrim"></div><span class="brand-banner-name">Shaik Riyan Shareef</span></div><main><a class="back" href="index.html">← Back to portfolio</a><h1>Cookie Policy</h1><p>Last updated: July 2026</p><p>This portfolio does not set first-party tracking or advertising cookies. It does not use login sessions, personalized advertising, or behavioral analytics.</p><h2>Third-party resources</h2><p>External resources such as Google Fonts or linked platforms may use cookies or similar technologies according to their own policies.</p><h2>Browser controls</h2><p>You can restrict or delete cookies through your browser settings.</p></main></body></html>
