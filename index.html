@@ -283,7 +283,7 @@
 
     .hero-stage {
       position: relative;
-      min-height: 760px;
+      min-height: 650px;
       display: grid;
       place-items: center;
       perspective: 1400px;
@@ -325,8 +325,8 @@
 
     .glass-object {
       position: relative;
-      width: min(420px, 78vw);
-      aspect-ratio: 9 / 16;
+      width: min(640px, 92vw);
+      aspect-ratio: 1.2 / .83;
       transform-style: preserve-3d;
       transition: transform .18s ease-out;
     }
@@ -376,10 +376,9 @@
       width: 100%;
       height: 100%;
       object-fit: cover;
-      object-position: 50% 20%;
+      object-position: 50% 15%;
       filter: contrast(1.04) saturate(.86);
       transform: scale(1.01);
-      background: #0a0908;
     }
 
     .photo-vignette {
@@ -434,6 +433,50 @@
         inset 0 4px 12px rgba(240,211,145,.08),
         0 18px 42px rgba(0,0,0,.48);
       transform: rotateX(70deg) translateZ(-20px);
+    }
+
+    .walk-scroll {
+      position: relative;
+      height: 380vh;
+    }
+
+    .walk-scroll-stage {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      display: grid;
+      place-items: center;
+      padding-top: 110px;
+      overflow: hidden;
+      isolation: isolate;
+    }
+
+    .walk-glow {
+      position: absolute;
+      width: min(70vw, 900px);
+      aspect-ratio: 1;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(200,156,74,.18), transparent 65%);
+      filter: blur(50px);
+      z-index: -1;
+    }
+
+    #walkCanvas {
+      display: block;
+      width: auto;
+      height: auto;
+      max-height: 74vh;
+      max-width: min(560px, 88vw);
+      filter: drop-shadow(0 30px 70px rgba(0,0,0,.55));
+      opacity: 0;
+      transition: opacity .6s ease;
+    }
+
+    #walkCanvas.is-ready { opacity: 1; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .walk-scroll { height: auto; }
+      .walk-scroll-stage { position: relative; height: auto; padding: 60px 0; }
     }
 
     .about-strip {
@@ -833,7 +876,7 @@
         grid-template-columns: 1fr;
         gap: 50px;
       }
-      .hero-stage { min-height: 780px; }
+      .hero-stage { min-height: 610px; }
       .about-strip {
         grid-template-columns: repeat(4, 1fr);
       }
@@ -860,8 +903,8 @@
       .nav .button { min-height: 42px; padding-inline: 14px; font-size: 11px; }
       .hero { padding-top: 106px; }
       h1 { font-size: clamp(54px, 16vw, 80px); }
-      .hero-stage { min-height: 560px; }
-      .glass-object { width: min(300px, 72vw); }
+      .hero-stage { min-height: 470px; }
+      .glass-object { width: min(560px, 100%); }
       .about-strip {
         grid-template-columns: repeat(2, 1fr);
         padding: 18px;
@@ -886,7 +929,7 @@
     }
 
     @media (max-width: 480px) {
-      .hero-stage { min-height: 460px; }
+      .hero-stage { min-height: 390px; }
       .about-strip { grid-template-columns: 1fr; }
       .about-copy,
       .contact-mini,
@@ -960,7 +1003,7 @@
 
         <div class="glass-object" id="glassObject">
           <div class="glass-frame">
-            <video class="hero-photo" id="heroVideo" src="assets/videos/hero-walk.mp4" poster="assets/videos/hero-walk-poster.jpg" muted playsinline preload="auto"></video>
+            <img class="hero-photo" src="assets/images/portrait.jpg" alt="Shaik Riyan Shareef">
             <div class="photo-vignette" aria-hidden="true"></div>
             <span class="bolt b1" aria-hidden="true"></span>
             <span class="bolt b2" aria-hidden="true"></span>
@@ -969,6 +1012,13 @@
           </div>
           <div class="platform" aria-hidden="true"></div>
         </div>
+      </div>
+    </section>
+
+    <section class="walk-scroll" id="walkScroll">
+      <div class="walk-scroll-stage">
+        <div class="walk-glow" aria-hidden="true"></div>
+        <canvas id="walkCanvas" width="480" height="853" aria-label="Shaik Riyan Shareef walking, animated by scrolling"></canvas>
       </div>
     </section>
 
@@ -1214,41 +1264,73 @@
 
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    const heroVideo = document.getElementById("heroVideo");
-    let videoDuration = 0;
-    if (heroVideo) {
-      heroVideo.pause();
-      heroVideo.addEventListener("loadedmetadata", () => {
-        videoDuration = heroVideo.duration || 0;
-      });
-      if (heroVideo.readyState >= 1) videoDuration = heroVideo.duration || 0;
-    }
+    const walkCanvas = document.getElementById("walkCanvas");
+    if (walkCanvas) {
+      const ctx = walkCanvas.getContext("2d");
+      const frameCount = 120;
+      const frames = new Array(frameCount);
+      const framePath = (i) => `assets/videos/frames/f${String(i).padStart(3, "0")}.jpg`;
 
-    const heroSection = document.getElementById("home");
-    if (heroSection && !reduceMotion) {
-      let scrollTicking = false;
-
-      function applyHeroScroll() {
-        scrollTicking = false;
-        const rect = heroSection.getBoundingClientRect();
-        const span = rect.height * .9 || 1;
-        const progress = Math.min(Math.max(-rect.top / span, 0), 1);
-
-        if (heroVideo && videoDuration) {
-          heroVideo.currentTime = progress * videoDuration;
+      function drawFrame(index) {
+        const img = frames[index];
+        if (img && img.complete && img.naturalWidth) {
+          ctx.clearRect(0, 0, walkCanvas.width, walkCanvas.height);
+          ctx.drawImage(img, 0, 0, walkCanvas.width, walkCanvas.height);
         }
-
-        stage.style.opacity = 1 - (Math.max(progress - .7, 0) / .3) * .7;
       }
 
-      window.addEventListener("scroll", () => {
-        if (!scrollTicking) {
-          scrollTicking = true;
-          requestAnimationFrame(applyHeroScroll);
-        }
-      }, { passive: true });
+      if (reduceMotion) {
+        const midImg = new Image();
+        midImg.onload = () => {
+          frames[Math.floor(frameCount / 2)] = midImg;
+          drawFrame(Math.floor(frameCount / 2));
+          walkCanvas.classList.add("is-ready");
+        };
+        midImg.src = framePath(Math.floor(frameCount / 2));
+      } else {
+        let loadedCount = 0;
+        let lastDrawnIndex = -1;
 
-      applyHeroScroll();
+        for (let i = 0; i < frameCount; i++) {
+          const img = new Image();
+          img.onload = img.onerror = () => {
+            loadedCount++;
+            if (i === 0) {
+              drawFrame(0);
+              walkCanvas.classList.add("is-ready");
+            }
+          };
+          img.src = framePath(i);
+          frames[i] = img;
+        }
+
+        const walkWrap = document.getElementById("walkScroll");
+        let scrollTicking = false;
+
+        function applyWalkScroll() {
+          scrollTicking = false;
+          const rect = walkWrap.getBoundingClientRect();
+          const total = rect.height - window.innerHeight;
+          const progress = total > 0
+            ? Math.min(Math.max(-rect.top / total, 0), 1)
+            : (rect.top <= 0 ? 1 : 0);
+
+          const index = Math.min(frameCount - 1, Math.round(progress * (frameCount - 1)));
+          if (index !== lastDrawnIndex) {
+            lastDrawnIndex = index;
+            drawFrame(index);
+          }
+        }
+
+        window.addEventListener("scroll", () => {
+          if (!scrollTicking) {
+            scrollTicking = true;
+            requestAnimationFrame(applyWalkScroll);
+          }
+        }, { passive: true });
+
+        applyWalkScroll();
+      }
     }
   </script>
 
